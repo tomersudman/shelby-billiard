@@ -1879,20 +1879,21 @@ function setSyncIndicator(state) {
 async function loadFromSheets() {
   try {
     setSyncIndicator('syncing');
-    const res = await fetch(SHEET_URL + '?action=load');
+    const res = await fetch(SHEET_URL + '?action=getAll');
     const text = await res.text();
     let data;
     try { data = JSON.parse(text); } catch(e) { setSyncIndicator('error'); return; }
     if (data && data.players && data.players.length > 0) {
-      localStorage.setItem('shelby_players', JSON.stringify(data.players));
-      if (data.tournaments) localStorage.setItem('shelby_tournaments', JSON.stringify(data.tournaments));
-      loadLocalData();
+      PLAYERS = data.players;
+      if (data.tournaments && data.tournaments.length > 0) TOURNEY_HISTORY = data.tournaments;
+      localStorage.setItem('shelby_players', JSON.stringify(PLAYERS));
+      localStorage.setItem('shelby_tournaments', JSON.stringify(TOURNEY_HISTORY));
       renderPlayers();
       setSyncIndicator('ok');
       console.log('[Sheets] Loaded', data.players.length, 'players from Sheets');
     } else {
       setSyncIndicator('ok');
-      pushToSheets(true);
+      console.log('[Sheets] No data in Sheets yet, using built-in data');
     }
   } catch(e) {
     setSyncIndicator('error');
@@ -1904,15 +1905,16 @@ async function loadFromSheetsUI() {
   if (!confirm('⚠ This will pull data from Google Sheets and replace all local data. Continue?')) return;
   setSheetStatus('⏳ Loading from Sheets...', 'var(--accent)');
   try {
-    const res = await fetch(SHEET_URL + '?action=load');
+    const res = await fetch(SHEET_URL + '?action=getAll');
     const data = await res.json();
-    if (data.players) {
-      localStorage.setItem('shelby_players', JSON.stringify(data.players));
-      if (data.tournaments) localStorage.setItem('shelby_tournaments', JSON.stringify(data.tournaments));
-      loadLocalData();
+    if (data && data.players && data.players.length > 0) {
+      PLAYERS = data.players;
+      if (data.tournaments && data.tournaments.length > 0) TOURNEY_HISTORY = data.tournaments;
+      localStorage.setItem('shelby_players', JSON.stringify(PLAYERS));
+      localStorage.setItem('shelby_tournaments', JSON.stringify(TOURNEY_HISTORY));
       renderPlayers();
-      setSheetStatus('✅ Loaded from Sheets at ' + new Date().toLocaleTimeString(), 'var(--green)');
-      showToast('Data restored from Google Sheets!');
+      setSheetStatus('✅ Loaded ' + data.players.length + ' players from Sheets at ' + new Date().toLocaleTimeString(), 'var(--green)');
+      showToast('Data loaded from Google Sheets!');
     } else {
       setSheetStatus('⚠ No data found in Sheets', 'var(--yellow)');
     }
