@@ -1073,6 +1073,7 @@ function saveNewPlayer() {
     name, handicap: hcp, running_pts: 0, status_log: '',
     lifetime_win_pct: 0, cur_hcp_win_pct: 0, games_played: 0, tournaments: []
   });
+  PLAYERS.sort((a, b) => hcpIdx(a.handicap) - hcpIdx(b.handicap) || a.name.localeCompare(b.name));
   savePlayers();
   closeAddPlayer();
   renderPlayers();
@@ -1221,7 +1222,7 @@ function addResultRow() {
       <input class="res-input" placeholder="Type player name…" list="${playerListId}"
         oninput="onPlayerInput(this)" autocomplete="off">
       <datalist id="${playerListId}">
-        ${PLAYERS.map(p => `<option value="${p.name}">`).join('')}
+        ${[...PLAYERS].sort((a,b) => hcpIdx(a.handicap)-hcpIdx(b.handicap) || a.name.localeCompare(b.name)).map(p => `<option value="${p.name}">`).join('')}
       </datalist>
     </td>
     <td style="text-align:center;min-width:80px">—</td>
@@ -1336,6 +1337,7 @@ function saveResults() {
     const oldHcp = p.handicap;
     p.running_pts = (p.running_pts || 0) + e.points;
     p.games_played = (p.games_played || 0) + (e.wins || 0) + (e.losses || 0);
+    if (!p.tournaments) p.tournaments = [];
     p.tournaments.unshift({
       label: `${date} — ${type}`,
       date, placement: e.placement,
@@ -1396,16 +1398,15 @@ function saveResults() {
   savePlayers();
   renderUndoList();
 
-  toast(`✓ Saved results for ${entries.length} players!`);
+  clearResults();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  toast(`✓ Saved! Results recorded for ${entries.length} players.`);
 
-  // Show promotion alerts
   if (promoChanges.length) {
     showPromoAlerts(promoChanges);
   } else {
     document.getElementById('promo-alerts-area').innerHTML = '';
   }
-
-  clearResults();
 }
 
 function showPromoAlerts(changes) {
