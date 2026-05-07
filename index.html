@@ -1935,9 +1935,26 @@ async function forcePushBakedData() {
   status.textContent = '✅ Done! All devices will now see the updated data.';
 }
 
-// Startup: load from Sheets, fall back to baked data
+// Startup: if data version outdated, push baked data first, else pull from Sheets
+const DATA_VERSION = '2026-05-07';
+const localVersion = localStorage.getItem('shelby_data_version');
 renderPlayers();
-loadFromSheets();
+if (localVersion !== DATA_VERSION) {
+  // First time with new data - use baked data and push to Sheets
+  PLAYERS = JSON.parse(JSON.stringify(BAKED_PLAYERS));
+  TOURNEY_HISTORY = JSON.parse(JSON.stringify(BAKED_TOURNEY_HISTORY));
+  localStorage.setItem('shelby_players', JSON.stringify(PLAYERS));
+  localStorage.setItem('shelby_tournaments', JSON.stringify(TOURNEY_HISTORY));
+  localStorage.setItem('shelby_matches', JSON.stringify(BAKED_MATCHES));
+  localStorage.setItem('shelby_data_version', DATA_VERSION);
+  renderPlayers();
+  pushToSheets(true);
+  console.log('[Startup] New data version detected, pushed baked data to Sheets');
+} else {
+  // Data is current - pull latest from Sheets as normal
+  loadFromSheets();
+  console.log('[Startup] Loading from Sheets...');
+}
 </script>
 </body>
 </html>
