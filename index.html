@@ -283,7 +283,53 @@ main { position:relative; z-index:1; padding:22px 24px; max-width:1500px; margin
   .rules-grid { grid-template-columns:1fr; }
   .modal-stats { grid-template-columns:1fr 1fr; }
 }
-@media(max-width:600px) { header{padding:0 12px;} main{padding:12px;} nav .nav-btn{padding:7px 9px;font-size:12px;} }
+
+@media(max-width:600px) {
+  /* Header & Nav */
+  header { padding:0 10px; height:48px; }
+  .logo-text { font-size:16px; }
+  nav { gap:2px; overflow-x:auto; -webkit-overflow-scrolling:touch; flex-wrap:nowrap; padding:0 8px; }
+  nav .nav-btn { padding:6px 8px; font-size:10px; white-space:nowrap; flex-shrink:0; }
+  main { padding:10px; }
+
+  /* Players tab — scrollable, sticky first columns */
+  .tbl-wrap { border-radius:8px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .data-table { min-width:560px; }
+  .data-table td { padding:9px 8px; font-size:12px; }
+  .data-table th { padding:9px 8px; font-size:11px; white-space:nowrap; }
+  .data-table th:nth-child(1) { min-width:110px; }
+  .hcp-badge { font-size:10px; padding:2px 5px; }
+  .player-status { font-size:10px; }
+
+  /* Search & filter bar */
+  .toolbar { flex-wrap:wrap; gap:6px; }
+  .toolbar .search-box { width:100%; }
+  .toolbar .sort-select { flex:1; min-width:0; }
+  .filter-row { flex-wrap:wrap; gap:4px; }
+  .hcp-btn { font-size:11px; padding:4px 8px; }
+
+  /* Dashboard — 2 col stat cards */
+  #dash-stats { grid-template-columns:repeat(2,1fr) !important; gap:8px !important; }
+  .stat-card { padding:12px 10px; }
+  .stat-card .stat-val, .stat-card .stat-value { font-size:28px; }
+  .stat-card .stat-label { font-size:10px; }
+  .stat-card .stat-sub { font-size:10px; }
+
+  /* Dashboard panels — stack vertically */
+  #dash-panels { grid-template-columns:1fr !important; }
+
+  /* Leaderboard */
+  .lb-name { font-size:12px; }
+  .lb-val { font-size:12px; }
+
+  /* Matrix — smaller cells */
+  .matrix-table { font-size:9px; }
+  .matrix-table th, .matrix-table td { width:34px; min-width:34px; max-width:34px; padding:2px 1px; }
+
+  /* Add player button */
+  .add-btn { width:100%; justify-content:center; }
+}
+
 </style>
 </head>
 <body>
@@ -338,7 +384,7 @@ main { position:relative; z-index:1; padding:22px 24px; max-width:1500px; margin
 <!-- ══════════════════════ DASHBOARD ══════════════════════ -->
 <div id="view-dashboard" class="view">
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px" id="dash-stats"></div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px">
+  <div id="dash-panels" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px">
     <div class="panel">
       <div class="panel-header"><span class="panel-title">🏆 Top Win Rates</span><span style="color:var(--text-mute);font-size:10px;margin-left:auto">min 5 games</span></div>
       <div class="panel-body" id="top-winrates"></div>
