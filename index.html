@@ -340,7 +340,7 @@ main { position:relative; z-index:1; padding:22px 24px; max-width:1500px; margin
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px" id="dash-stats"></div>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:20px">
     <div class="panel">
-      <div class="panel-header"><span class="panel-title">🏆 Top Win Rates</span><span style="color:var(--text-mute);font-size:10px;margin-left:auto">min 10 games</span></div>
+      <div class="panel-header"><span class="panel-title">🏆 Top Win Rates</span><span style="color:var(--text-mute);font-size:10px;margin-left:auto">min 5 games</span></div>
       <div class="panel-body" id="top-winrates"></div>
     </div>
     <div class="panel">
@@ -548,23 +548,6 @@ main { position:relative; z-index:1; padding:22px 24px; max-width:1500px; margin
 
 
 <div id="view-backup" class="view">
-  <div class="panel" style="margin-bottom:18px">
-    <div class="panel-header">
-      <span class="panel-title">☁️ Google Sheets Sync</span>
-      <span style="color:var(--text-mute);font-size:10px;margin-left:auto">Push/pull data to your Google Sheet</span>
-    </div>
-    <div class="panel-body">
-      <p style="color:var(--text-dim);font-size:13px;margin-bottom:16px;line-height:1.6">
-        Sync your player and tournament data to Google Sheets for cloud backup and sharing. 
-        Use <strong>Push</strong> to save current data, or <strong>Pull</strong> to restore from Sheets.
-      </p>
-      <div style="display:flex;gap:12px;flex-wrap:wrap">
-        <button class="btn-primary" onclick="manualSheetSync()" style="font-size:13px;padding:10px 22px">⬆ Push to Sheets</button>
-        <button onclick="loadFromSheetsUI()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:13px;padding:10px 22px;border-radius:8px;cursor:pointer;font-weight:700">⬇ Pull from Sheets</button>
-      </div>
-      <p id="gs-status" style="margin-top:14px;font-size:12px;color:var(--text-mute)">Not synced yet</p>
-    </div>
-  </div>
   <div class="panel" style="margin-bottom:18px">
     <div class="panel-header">
       <span class="panel-title">💾 Download Backup</span>
@@ -999,7 +982,7 @@ function applyAdminEdit() {
   // Save & re-render
   savePlayers();
   renderPlayers();
-  renderDash();
+
 
   const savedName = p.name, savedHcp = p.handicap, savedPts = p.running_pts;
   const ptsStr = (savedPts >= 0 ? '+' : '') + savedPts;
@@ -1100,35 +1083,15 @@ function buildDashboard() {
     <div class="stat-sub">${s.sub}</div>
   </div>`).join('');
 
-  // Count games played at current handicap tier for each player
+  // Use games_played field directly — updated on every tournament save
   const hcpGamesMap = {};
   PLAYERS.forEach(p => {
-    // Walk tournament history to count games at current handicap
-    // We use a rough approach: count all games since last promo/demotion date
-    // For simplicity, count all recorded games where handicap matches (approximated via total games_played)
-    // Use cur_hcp_win_pct and games that contributed to it
-    // Best available: count tournament entries that happened at current tier
-    // (since we don't store per-game hcp, use games_played as a proxy shown as "tier games")
-    // Actually compute: walk tournaments in order and count games since last hcp change
-    let gamesAtCurrentHcp = 0;
-    const tList = [...(p.tournaments || [])].reverse(); // oldest first
-    let curHcp = null;
-    // Try to figure out when current hcp started by scanning status_log date
-    // Simpler: count from most recent promo/demotion event forward
-    // Since we can't perfectly reconstruct, count all games in tournaments array as tier games
-    // (they were entered under this player record which may have changed hcp over time)
-    // Best proxy available: count wins+losses in tournament history
-    let tw = 0, tl = 0;
-    (p.tournaments || []).forEach(t => {
-      if (typeof t.wins === 'number') tw += t.wins;
-      if (typeof t.losses === 'number') tl += t.losses;
-    });
-    hcpGamesMap[p.name] = tw + tl;
+    hcpGamesMap[p.name] = p.games_played || 0;
   });
 
   const qualified = PLAYERS.filter(p => {
     const g = hcpGamesMap[p.name] || 0;
-    return g >= 10 && p.cur_hcp_win_pct > 0;
+    return g >= 5 && p.cur_hcp_win_pct > 0;
   }).sort((a,b) => b.cur_hcp_win_pct - a.cur_hcp_win_pct).slice(0,5);
 
   document.getElementById('top-winrates').innerHTML = qualified.length ? qualified.map((p,i) => {
@@ -1142,7 +1105,7 @@ function buildDashboard() {
         <div style="font-size:10px;color:var(--text-mute);margin-top:1px">${g} games</div>
       </div>
     </div>`;
-  }).join('') : '<p style="color:var(--text-mute);font-size:12px">No players with 10+ games yet.</p>';
+  }).join('') : '<p style="color:var(--text-mute);font-size:12px">No players with 5+ games yet.</p>';
 
   const active = [...PLAYERS].sort((a,b) => b.games_played-a.games_played).slice(0,5);
   document.getElementById('most-active').innerHTML = active.map((p,i) => {
@@ -1336,6 +1299,8 @@ function saveResults() {
     const oldPts = p.running_pts;
     const oldHcp = p.handicap;
     p.running_pts = (p.running_pts || 0) + e.points;
+    // C players cannot go below -15
+    if (p.handicap === 'C') p.running_pts = Math.max(p.running_pts, -15);
     p.games_played = (p.games_played || 0) + (e.wins || 0) + (e.losses || 0);
     if (!p.tournaments) p.tournaments = [];
     p.tournaments.unshift({
@@ -1496,7 +1461,7 @@ function undoTournament(idx) {
   saveTournaments();
   savePlayers();
   renderPlayers();
-  renderDash();
+
   renderUndoList();
   toast(`↩ Tournament undone. Points & handicaps restored for ${t.entries.length} players.`);
   document.getElementById('promo-alerts-area').innerHTML = '';
@@ -1601,9 +1566,11 @@ function toggleHistory(id) {
 // ════════════════════════════════════════════════════════════
 function savePlayers() {
   localStorage.setItem('shelby_players', JSON.stringify(PLAYERS));
+  autoPush();
 }
 function saveTournaments() {
   localStorage.setItem('shelby_tournaments', JSON.stringify(TOURNAMENTS));
+  autoPush();
 }
 function buildMatrixTable(tableId) {
   const table = document.getElementById(tableId);
@@ -1703,6 +1670,7 @@ function saveMatchResults() {
   for (let i=0; i<10; i++) addMatchRow();
   toast(`✓ ${count} match result${count>1?'s':''} saved!`);
   buildMatrixTable('dash-matrix');
+  autoPush();
 }
 
 function clearMatchResults() {
@@ -1829,6 +1797,14 @@ function setSheetStatus(msg, color) {
 async function manualSheetSync() {
   setSheetStatus('⏳ Syncing...', 'var(--accent)');
   await pushToSheets(false);
+}
+
+// Auto-push: debounced so rapid changes only trigger one push
+let _autoPushTimer = null;
+function autoPush() {
+  setSyncIndicator('syncing');
+  clearTimeout(_autoPushTimer);
+  _autoPushTimer = setTimeout(() => pushToSheets(true), 1500);
 }
 
 async function pushToSheets(silent) {
