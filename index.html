@@ -1202,6 +1202,7 @@ function saveNewPlayer() {
   savePlayers();
   closeAddPlayer();
   renderPlayers();
+  refreshResultDropdowns();
   toast(`✓ ${name} (${hcp}) added!`);
 }
 
@@ -1321,14 +1322,17 @@ function addResultRow() {
   const tbody = document.getElementById('res-tbody');
   const tr = document.createElement('tr');
   const rowIdx = tbody.children.length;
-  const playerListId = 'players-list-' + rowIdx;
+  const sorted = [...PLAYERS].sort((a,b) => hcpIdx(a.handicap)-hcpIdx(b.handicap) || a.name.localeCompare(b.name));
   tr.innerHTML = `
     <td style="position:relative">
-      <input class="res-input" placeholder="Type player name…" list="${playerListId}"
-        oninput="onPlayerInput(this)" autocomplete="off">
-      <datalist id="${playerListId}">
-        ${[...PLAYERS].sort((a,b) => hcpIdx(a.handicap)-hcpIdx(b.handicap) || a.name.localeCompare(b.name)).map(p => `<option value="${p.name}">`).join('')}
-      </datalist>
+      <input class="res-input" placeholder="Type or select player…"
+        oninput="onPlayerInput(this);filterDropdown(this)" 
+        onfocus="showDropdown(this)"
+        onblur="setTimeout(()=>hideDropdown(this),200)"
+        autocomplete="off">
+      <div class="player-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface2);border:1px solid var(--accent);border-radius:6px;max-height:200px;overflow-y:auto;z-index:999;">
+        ${sorted.map(p => `<div class="pd-option" onmousedown="selectPlayer(this,'${p.name.replace(/'/g,"&#39;")}')" style="padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)">${p.name} <span style="font-size:10px;color:var(--text-mute)">${p.handicap}</span></div>`).join('')}
+      </div>
     </td>
     <td style="text-align:center;min-width:80px">—</td>
     <td>
@@ -1341,6 +1345,37 @@ function addResultRow() {
     <td class="pts-cell" style="color:var(--text-mute)">—</td>
     <td><button onclick="this.closest('tr').remove();updateAutoCount()" style="background:none;border:none;color:var(--text-mute);cursor:pointer;font-size:15px;padding:2px 6px" title="Remove row">✕</button></td>`;
   tbody.appendChild(tr);
+}
+
+function refreshResultDropdowns() {
+  const sorted = [...PLAYERS].sort((a,b) => hcpIdx(a.handicap)-hcpIdx(b.handicap) || a.name.localeCompare(b.name));
+  const html = sorted.map(p => `<div class="pd-option" onmousedown="selectPlayer(this,'${p.name.replace(/'/g,"&#39;")}')" style="padding:8px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border)">${p.name} <span style="font-size:10px;color:var(--text-mute)">${p.handicap}</span></div>`).join('');
+  document.querySelectorAll('.player-dropdown').forEach(dd => { dd.innerHTML = html; });
+}
+
+function showDropdown(input) {
+  const dd = input.nextElementSibling;
+  if (dd) { dd.style.display = 'block'; filterDropdown(input); }
+}
+function hideDropdown(input) {
+  const dd = input.nextElementSibling;
+  if (dd) dd.style.display = 'none';
+}
+function filterDropdown(input) {
+  const dd = input.nextElementSibling;
+  if (!dd) return;
+  const q = input.value.toLowerCase();
+  dd.querySelectorAll('.pd-option').forEach(opt => {
+    opt.style.display = opt.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+  dd.style.display = 'block';
+}
+function selectPlayer(opt, name) {
+  const td = opt.closest('td');
+  const input = td.querySelector('input');
+  input.value = name;
+  opt.closest('.player-dropdown').style.display = 'none';
+  onPlayerInput(input);
 }
 
 function onPlayerInput(input) {
