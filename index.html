@@ -1365,7 +1365,19 @@ function saveResults() {
   });
 
   // Store tournament for undo
-  TOURNAMENTS.unshift({ date, type, totalPlayers: n, entries: snapshot });
+  const newTourney = { date, type, totalPlayers: n, entries: snapshot };
+  TOURNAMENTS.unshift(newTourney);
+  // Also add to TOURNEY_HISTORY so it persists across sessions
+  TOURNEY_HISTORY.unshift({
+    date, type, label: `${date} — ${type}`,
+    is_high_stakes: type === 'High Stakes',
+    total_players: n,
+    participants: snapshot.map(e => ({
+      name: e.name, handicap: e.handicap, placement: e.placement,
+      wins: e.wins, losses: e.losses, points: e.points
+    }))
+  });
+  localStorage.setItem('shelby_tourney_history', JSON.stringify(TOURNEY_HISTORY));
   saveTournaments();
   savePlayers();
   renderUndoList();
@@ -1873,12 +1885,15 @@ async function loadFromSheets() {
     try { data = JSON.parse(text); } catch(e) { setSyncIndicator('error'); return; }
     if (data && data.players && data.players.length > 0) {
       PLAYERS = data.players;
-      if (data.tournaments && data.tournaments.length > 0) TOURNEY_HISTORY = data.tournaments;
+      // Load tournament history from Sheets if it has data with participants
+      if (data.tournaments && data.tournaments.length > 0 && 
+          data.tournaments[0].participants && data.tournaments[0].participants.length > 0) {
+        TOURNEY_HISTORY = data.tournaments;
+      }
       localStorage.setItem('shelby_players', JSON.stringify(PLAYERS));
-      localStorage.setItem('shelby_tournaments', JSON.stringify(TOURNEY_HISTORY));
       renderPlayers();
       setSyncIndicator('ok');
-      console.log('[Sheets] Loaded', data.players.length, 'players from Sheets');
+      console.log('[Sheets] Loaded', data.players.length, 'players,', (data.tournaments||[]).length, 'tournaments from Sheets');
     } else {
       setSyncIndicator('ok');
       console.log('[Sheets] No data in Sheets yet, using built-in data');
@@ -1935,26 +1950,11 @@ async function forcePushBakedData() {
   status.textContent = '✅ Done! All devices will now see the updated data.';
 }
 
-// Startup: if data version outdated, push baked data first, else pull from Sheets
-const DATA_VERSION = '2026-05-07';
-const localVersion = localStorage.getItem('shelby_data_version');
+// Startup: use baked data, then load latest from Sheets
+TOURNEY_HISTORY = JSON.parse(JSON.stringify(BAKED_TOURNEY_HISTORY));
+localStorage.setItem('shelby_matches', JSON.stringify(BAKED_MATCHES));
 renderPlayers();
-if (localVersion !== DATA_VERSION) {
-  // First time with new data - use baked data and push to Sheets
-  PLAYERS = JSON.parse(JSON.stringify(BAKED_PLAYERS));
-  TOURNEY_HISTORY = JSON.parse(JSON.stringify(BAKED_TOURNEY_HISTORY));
-  localStorage.setItem('shelby_players', JSON.stringify(PLAYERS));
-  localStorage.setItem('shelby_tournaments', JSON.stringify(TOURNEY_HISTORY));
-  localStorage.setItem('shelby_matches', JSON.stringify(BAKED_MATCHES));
-  localStorage.setItem('shelby_data_version', DATA_VERSION);
-  renderPlayers();
-  pushToSheets(true);
-  console.log('[Startup] New data version detected, pushed baked data to Sheets');
-} else {
-  // Data is current - pull latest from Sheets as normal
-  loadFromSheets();
-  console.log('[Startup] Loading from Sheets...');
-}
+loadFromSheets();
 </script>
 </body>
 </html>
