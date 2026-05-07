@@ -286,11 +286,48 @@ main { position:relative; z-index:1; padding:22px 24px; max-width:1500px; margin
 
 @media(max-width:600px) {
   /* Header & Nav */
-  header { padding:0 10px; height:48px; }
-  .logo-text { font-size:16px; }
-  nav { gap:2px; overflow-x:auto; -webkit-overflow-scrolling:touch; flex-wrap:nowrap; padding:0 8px; }
-  nav .nav-btn { padding:6px 8px; font-size:10px; white-space:nowrap; flex-shrink:0; }
-  main { padding:10px; }
+  header { padding:0 10px; height:44px; }
+  .logo-text { font-size:15px; }
+  header nav { display:none; }
+  main { padding:10px; padding-bottom:80px; }
+
+  /* Bottom tab bar — mobile only */
+}
+
+/* Hide mobile nav on desktop — outside any media query */
+#mobile-nav { display:none; }
+
+@media(max-width:600px) {
+  #mobile-nav {
+    display:flex;
+    position:fixed;
+    bottom:0; left:0; right:0;
+    background:var(--surface2);
+    border-top:1px solid var(--border);
+    z-index:999;
+    padding:0;
+    height:62px;
+  }
+  #mobile-nav .m-tab {
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:3px;
+    font-size:9px;
+    color:var(--text-mute);
+    border:none;
+    background:none;
+    cursor:pointer;
+    padding:6px 2px;
+    transition:color 0.15s;
+    font-family:inherit;
+    letter-spacing:0.02em;
+  }
+  #mobile-nav .m-tab .m-icon { font-size:18px; line-height:1; }
+  #mobile-nav .m-tab.active { color:var(--accent); }
+  #mobile-nav .m-tab.active .m-icon { transform:scale(1.15); }
 
   /* Players tab — scrollable, sticky first columns */
   .tbl-wrap { border-radius:8px; overflow-x:auto; -webkit-overflow-scrolling:touch; }
@@ -334,8 +371,27 @@ main { position:relative; z-index:1; padding:22px 24px; max-width:1500px; margin
 </head>
 <body>
 
+<!-- Mobile bottom nav (hidden on desktop via CSS) -->
+<div id="mobile-nav">
+  <button class="m-tab active" onclick="mobileNav('players',this)">
+    <span class="m-icon">👤</span>Players
+  </button>
+  <button class="m-tab" onclick="mobileNav('dashboard',this)">
+    <span class="m-icon">📊</span>Dashboard
+  </button>
+  <button class="m-tab" onclick="mobileNav('history',this)">
+    <span class="m-icon">🏆</span>History
+  </button>
+  <button class="m-tab" onclick="mobileNav('entry',this)">
+    <span class="m-icon">✏️</span>Results
+  </button>
+  <button class="m-tab" onclick="mobileNav('backup',this)">
+    <span class="m-icon">💾</span>More
+  </button>
+</div>
+
 <header>
-  <div class="logo">🎱 SHELBY'S<span>POOL CLUB</span></div>
+  <div class="logo">🎱 SHELBY'S<span>BILLIARD LOUNGE</span></div>
   <div id="sync-indicator" style="font-size:12px;color:var(--text-mute);padding:0 10px;white-space:nowrap;opacity:0.8;"></div>
   <nav>
     <button class="nav-btn active" onclick="showView('players',this)">Players</button>
@@ -726,9 +782,16 @@ main { position:relative; z-index:1; padding:22px 24px; max-width:1500px; margin
 // ════════════════════════════════════════════════════════════
 const HCP_ORDER = ['Pro','Elite+','Elite','A+','A','B++','B+','B','B-','C'];
 const HCP_COLORS = {
-  'Pro':'#8B4513','Elite+':'#ff6b6b','Elite':'#ff9999',
-  'A+':'#ffb347','A':'#ffd700','B++':'#da70d6',
-  'B+':'#87ceeb','B':'#90ee90','B-':'#98d8c8','C':'#b0b0b0'
+  'Pro':'#8B4513',
+  'Elite+':'#ff2222',
+  'Elite':'#ff7700',
+  'A+':'#ffd700',
+  'A':'#c8f000',
+  'B++':'#cc44ff',
+  'B+':'#00bfff',
+  'B':'#00e676',
+  'B-':'#69d4c4',
+  'C':'#b0b0b0'
 };
 
 // Promotion thresholds
@@ -809,6 +872,17 @@ function updatePtsPreview() {
 // ════════════════════════════════════════════════════════════
 // NAV
 // ════════════════════════════════════════════════════════════
+function mobileNav(id, btn) {
+  // Sync desktop nav too
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  const desktopBtn = [...document.querySelectorAll('.nav-btn')].find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes("'"+id+"'"));
+  if (desktopBtn) desktopBtn.classList.add('active');
+  // Update mobile tabs
+  document.querySelectorAll('#mobile-nav .m-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  showView(id, null);
+}
+
 function showView(id, btn) {
   // PIN protect Entry and Backup tabs
   if (id === 'entry' || id === 'backup') {
@@ -819,6 +893,11 @@ function showView(id, btn) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('view-'+id).classList.add('active');
+  // Sync mobile bottom nav
+  document.querySelectorAll('#mobile-nav .m-tab').forEach(b => {
+    const onclick = b.getAttribute('onclick') || '';
+    b.classList.toggle('active', onclick.includes("'"+id+"'"));
+  });
   if (btn) btn.classList.add('active');
   if (id === 'players')   renderPlayers();
   if (id === 'dashboard') buildDashboard();
