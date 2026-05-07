@@ -1032,7 +1032,17 @@ function openPlayerModal(name) {
     <div class="modal-stat-value" style="${s.color?'color:'+s.color:''}">${s.val}</div>
   </div>`).join('');
 
-  const ts = (p.tournaments || []).filter(t => t.wins!=='' || t.losses!=='' || t.placement || (t.points!==null && t.points!==''));
+  // Build tournament history from TOURNEY_HISTORY by searching participants
+  const fromHistory = [];
+  (TOURNEY_HISTORY || []).forEach(t => {
+    const entry = (t.participants || []).find(e => e.name === p.name);
+    if (entry && (entry.wins!=='' || entry.losses!=='' || entry.placement || (entry.points!==null && entry.points!==''))) {
+      fromHistory.push({ label: t.label, date: t.date, ...entry });
+    }
+  });
+  // Also include any from p.tournaments (newly entered this session)
+  const fromPlayer = (p.tournaments || []).filter(t => t.wins!=='' || t.losses!=='' || t.placement || (t.points!==null && t.points!==''));
+  const ts = [...fromPlayer, ...fromHistory.filter(h => !fromPlayer.find(fp => fp.label === h.label))];
   document.getElementById('m-tourneys').innerHTML = ts.length ? ts.map(t => {
     const pc = t.placement==='1st'?'p1':t.placement==='2nd'?'p2':t.placement==='3rd'?'p3':'';
     const pts2 = parseFloat(t.points);
