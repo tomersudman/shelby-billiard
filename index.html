@@ -919,28 +919,7 @@ function showView(id, btn) {
   if ((id === 'entry' || id === 'backup') && !sessionStorage.getItem('shelby_pin_ok')) {
     showPinModal('Admin access required', () => {
       sessionStorage.setItem('shelby_pin_ok', '1');
-      // Directly switch view without going through showView PIN check
-      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-      document.getElementById('view-'+id).classList.add('active');
-      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-      if (btn) btn.classList.add('active');
-      document.querySelectorAll('#mobile-nav .m-tab').forEach(b => {
-        b.classList.toggle('active', (b.getAttribute('onclick')||'').includes("'"+id+"'"));
-      });
-      if (id === 'entry') initEntry();
-      if (id === 'backup') {
-        const el = document.getElementById('backup-filename-preview');
-        if (el) el.textContent = getBackupFilename();
-        const lsP = JSON.parse(localStorage.getItem('shelby_players') || '[]');
-        const lsM = JSON.parse(localStorage.getItem('shelby_matches') || '[]');
-        const lsT = JSON.parse(localStorage.getItem('shelby_tournaments') || '[]');
-        const summary = document.getElementById('backup-data-summary');
-        if (summary) {
-          const memP = (typeof PLAYERS !== 'undefined') ? PLAYERS.length : 0;
-          summary.innerHTML = '📊 Data found in storage: <strong style="color:var(--text)">' + lsP.length + ' players</strong> · <strong style="color:var(--text)">' + lsM.length + ' matches</strong> · <strong style="color:var(--text)">' + lsT.length + ' tournaments</strong>' +
-            (memP !== lsP.length ? ' &nbsp;|&nbsp; In memory: ' + memP + ' players' : '');
-        }
-      }
+      showView(id, btn);
     });
     return;
   }
