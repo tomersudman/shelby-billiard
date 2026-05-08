@@ -1415,8 +1415,8 @@ function selectPlayer(opt, name) {
 }
 
 function onPlayerInput(input) {
-  // Check for duplicate player in same tournament
   const name = input.value.trim();
+  // Check for duplicate player in same tournament
   if (name) {
     const allInputs = document.querySelectorAll('#res-tbody tr td:first-child input');
     let count = 0;
@@ -1429,7 +1429,6 @@ function onPlayerInput(input) {
       input.title = '';
     }
   }
-  const name = input.value.trim();
   const p = PLAYERS.find(x => x.name.trim() === name);
   const row = input.closest('tr');
   const tds = row.querySelectorAll('td');
