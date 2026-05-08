@@ -1745,18 +1745,21 @@ function renderHistory() {
   const type = document.getElementById('hist-type-filter').value;
 
   // Combine embedded history + newly entered tournaments
-  const newTourneys = TOURNAMENTS.map(t => ({
-    date: t.date, label: `${t.date} — ${t.type}`,
-    is_high_stakes: t.type === 'High Stakes',
-    type: t.type,
-    total_players: t.totalPlayers,
-    participants: t.entries.map(e => ({
-      name: e.name,
-      handicap: (PLAYERS.find(p=>p.name===e.name)||{}).handicap || '',
-      placement: '', wins: '', losses: '', points: e.points,
-    })),
-    isNew: true,
-  }));
+  // Only show newTourneys that aren't already in TOURNEY_HISTORY
+  const newTourneys = TOURNAMENTS
+    .filter(t => !TOURNEY_HISTORY.find(h => h.date === t.date && h.type === t.type))
+    .map(t => ({
+      date: t.date, label: `${t.date} — ${t.type}`,
+      is_high_stakes: t.type === 'High Stakes',
+      type: t.type,
+      total_players: t.totalPlayers,
+      participants: t.entries.map(e => ({
+        name: e.name,
+        handicap: (PLAYERS.find(p=>p.name===e.name)||{}).handicap || '',
+        placement: '', wins: '', losses: '', points: e.points,
+      })),
+      isNew: true,
+    }));
 
   let all = [...newTourneys, ...TOURNEY_HISTORY];
 
@@ -1806,7 +1809,7 @@ function renderHistory() {
               <td style="font-weight:500">${p.name}</td>
               <td>${p.handicap ? hcpBadge(p.handicap) : '—'}</td>
               <td class="${pc}">${p.placement||'—'}</td>
-              <td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim)">${(p.wins!==undefined&&p.wins!==''&&p.losses!==undefined&&p.losses!=='') ? p.wins+'-'+p.losses : '—'}</td>
+              <td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim)">${(p.wins!==null&&p.wins!==undefined&&p.wins!==''&&p.losses!==null&&p.losses!==undefined&&p.losses!=='') ? p.wins+'-'+p.losses : '—'}</td>
               <td style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:${ptsc}">${!isNaN(pts)?(pts>0?'+'+pts:pts):'—'}</td>
             </tr>`;
           }).join('')}</tbody>
