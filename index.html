@@ -2130,6 +2130,7 @@ function closePinModal() {
 function checkPin() {
   const val = document.getElementById('pin-input').value.trim();
   if (val === ADMIN_PIN) {
+    window._adminUnlocked = true;
     closePinModal();
     if (_pinCallback) _pinCallback();
   } else {
