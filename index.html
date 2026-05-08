@@ -915,14 +915,7 @@ function mobileNav(id, btn) {
 }
 
 function showView(id, btn) {
-  // PIN protect Entry and Backup tabs
-  if ((id === 'entry' || id === 'backup') && !window._adminUnlocked) {
-    showPinModal('Admin access required', () => {
-      window._adminUnlocked = true;
-      showView(id, btn);
-    });
-    return;
-  }
+  // No PIN on tab navigation - PIN is checked on save actions
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('view-'+id).classList.add('active');
@@ -1477,6 +1470,7 @@ function clearResults() {
 // SAVE RESULTS + PROMOTION CHECK
 // ════════════════════════════════════════════════════════════
 function saveResults() {
+  if (!window._adminUnlocked) { showPinModal('Admin PIN required to save', () => { window._adminUnlocked = true; saveResults(); }); return; }
   const date = document.getElementById('t-date').value;
   const type = document.getElementById('t-type').value;
   const n    = parseInt(document.getElementById('t-players').value) || 0;
@@ -1890,6 +1884,7 @@ function addMatchRow() {
 }
 
 function saveMatchResults() {
+  if (!window._adminUnlocked) { showPinModal('Admin PIN required to save', () => { window._adminUnlocked = true; saveMatchResults(); }); return; }
   const rows = document.querySelectorAll('#match-tbody tr');
   const stored = JSON.parse(localStorage.getItem('shelby_matches') || '[]');
   let count = 0;
@@ -2154,6 +2149,7 @@ function getBackupFilename() {
 }
 
 function exportBackup() {
+  if (!window._adminUnlocked) { showPinModal('Admin PIN required', () => { window._adminUnlocked = true; exportBackup(); }); return; }
   // Read directly from localStorage AND from in-memory arrays — take whichever is bigger
   const lsPlayers     = JSON.parse(localStorage.getItem('shelby_players')     || '[]');
   const lsTournaments = JSON.parse(localStorage.getItem('shelby_tournaments') || '[]');
