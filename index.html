@@ -1371,11 +1371,11 @@ function addResultRow() {
     </td>
     <td style="display:flex;align-items:center;gap:3px;padding:4px">
       <select class="res-select wl-select" onchange="recomputeRow(this.closest('tr'))" style="width:52px;padding:5px 2px;text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px">
-        ${[0,1,2,3,4,5,6,7,8].map(n=>`<option value="${n}">${n}W</option>`).join('')}
+        ${[0,1,2,3,4,5,6,7,8].map(n=>`<option value="${n}">${n}</option>`).join('')}
       </select>
       <span style="color:var(--text-mute);font-size:11px">-</span>
       <select class="res-select wl-select" onchange="recomputeRow(this.closest('tr'))" style="width:52px;padding:5px 2px;text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px">
-        ${[0,1,2].map(n=>`<option value="${n}">${n}L</option>`).join('')}
+        ${[0,1,2].map(n=>`<option value="${n}">${n}</option>`).join('')}
       </select>
     </td>
     <td class="pts-cell" style="color:var(--text-mute)">—</td>
@@ -1573,24 +1573,21 @@ function saveResults() {
     }
   });
 
-  // Update win rates incrementally - add new wins/losses to existing totals
+  // Update games_played and win rates incrementally
   entries.forEach(e => {
     const p = PLAYERS.find(x => x.name.trim() === e.name.trim());
     if (!p) return;
     const newW = e.wins || 0;
     const newL = e.losses || 0;
-    if (newW === 0 && newL === 0) return;
-    // Back-calculate existing totals from stored win rate and games_played
     const prevGames = p.games_played || 0;
     const prevW = Math.round((p.lifetime_win_pct || 0) / 100 * prevGames);
     const totalW = prevW + newW;
-    const totalL = (prevGames - prevW) + newL;
-    const total = totalW + totalL;
-    if (total > 0) {
-      p.lifetime_win_pct = Math.round(totalW / total * 1000) / 10;
-      p.cur_hcp_win_pct  = Math.round(totalW / total * 1000) / 10;
+    const totalGames = prevGames + newW + newL;
+    if (totalGames > 0) {
+      p.lifetime_win_pct = Math.round(totalW / totalGames * 1000) / 10;
+      p.cur_hcp_win_pct  = Math.round(totalW / totalGames * 1000) / 10;
+      p.games_played = totalGames;
     }
-    p.games_played = total;
   });
 
   // Store tournament for undo
