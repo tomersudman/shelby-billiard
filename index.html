@@ -367,6 +367,15 @@ main { position:relative; z-index:1; padding:22px 24px; max-width:1500px; margin
   .add-btn { width:100%; justify-content:center; }
 }
 
+
+@keyframes pinShake {
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-8px)}
+  40%{transform:translateX(8px)}
+  60%{transform:translateX(-5px)}
+  80%{transform:translateX(5px)}
+}
+/* PIN Modal — uses same style as admin edit modal */
 </style>
 </head>
 <body>
@@ -455,7 +464,7 @@ main { position:relative; z-index:1; padding:22px 24px; max-width:1500px; margin
     </div>
   </div>
   <div class="panel" style="margin-bottom:20px">
-    <div class="panel-header"><span class="panel-title">🎯 Head-to-Head Handicap Matrix</span><span style="color:var(--text-mute);font-size:10px;margin-left:auto">Win rate by handicap matchup</span></div>
+    <div class="panel-header"><span class="panel-title">🎯 Head-to-Head Handicap Matrix</span><div style="margin-left:auto;text-align:right"><span style="color:var(--text-mute);font-size:10px">Win rate by handicap matchup</span><br><span style="color:var(--text-mute);font-size:10px">📖 Each % = <b>row tier's</b> win rate vs column tier</span></div></div>
     <div class="panel-body"><div class="matrix-wrap"><table class="matrix-table" id="dash-matrix"></table></div></div>
   </div>
 </div>
@@ -523,6 +532,26 @@ main { position:relative; z-index:1; padding:22px 24px; max-width:1500px; margin
 <!-- ══════════════════════ ENTER RESULTS ══════════════════════ -->
 <div id="view-entry" class="view">
   <div id="promo-alerts-area"></div>
+
+  <!-- AI Image Scanner -->
+  <div class="panel" style="margin-bottom:16px;border:1px solid var(--accent)">
+    <div class="panel-header">
+      <span class="panel-title">📸 Scan Results from Photo</span>
+      <span style="color:var(--text-mute);font-size:11px;margin-left:auto">AI-powered • Upload a photo of the results board</span>
+    </div>
+    <div class="panel-body">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+        <label style="cursor:pointer;background:var(--accent);color:#000;font-weight:700;padding:9px 18px;border-radius:7px;font-size:13px">
+          📷 Choose Photos (1 or 2)
+          <input type="file" accept="image/*" multiple id="scan-img-input" style="display:none" onchange="previewScanImages(this)">
+        </label>
+        <span id="scan-status" style="color:var(--text-mute);font-size:12px">Upload 1-2 photos of the results board — AI will fill in everything</span>
+      </div>
+      <div id="scan-previews" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px"></div>
+      <button id="scan-go-btn" onclick="runScan()" style="display:none;background:var(--green,#2e8b57);color:#fff;border:none;padding:9px 20px;border-radius:7px;font-size:13px;font-weight:700;cursor:pointer">🤖 Scan & Fill Results</button>
+    </div>
+  </div>
+
   <div class="entry-grid">
     <!-- Left: tournament info -->
     <div>
@@ -569,6 +598,7 @@ main { position:relative; z-index:1; padding:22px 24px; max-width:1500px; margin
     <div class="entry-panel">
       <div class="entry-panel-hdr">
         🏅 Player Results
+        <button class="btn-secondary" onclick="openAddPlayer()" style="font-size:11px;padding:5px 12px">+ Add Player</button>
         <button class="btn-secondary" onclick="addResultRow()" style="margin-left:auto;font-size:11px;padding:5px 12px">+ Add Row</button>
       </div>
       <div class="entry-panel-body">
@@ -873,22 +903,46 @@ function updatePtsPreview() {
 // NAV
 // ════════════════════════════════════════════════════════════
 function mobileNav(id, btn) {
-  // Sync desktop nav too
+  // Update mobile tabs active state
+  document.querySelectorAll('#mobile-nav .m-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  // Sync desktop nav
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   const desktopBtn = [...document.querySelectorAll('.nav-btn')].find(b => b.getAttribute('onclick') && b.getAttribute('onclick').includes("'"+id+"'"));
   if (desktopBtn) desktopBtn.classList.add('active');
-  // Update mobile tabs
-  document.querySelectorAll('#mobile-nav .m-tab').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  showView(id, null);
+  // Use showView (handles PIN for entry/backup)
+  showView(id, desktopBtn);
 }
 
 function showView(id, btn) {
   // PIN protect Entry and Backup tabs
-  if (id === 'entry' || id === 'backup') {
-    const pin = prompt('Enter Admin PIN:');
-    if (pin === null) return;
-    if (pin.trim() !== ADMIN_PIN) { toast('✕ Incorrect PIN.', true); return; }
+  if ((id === 'entry' || id === 'backup') && !sessionStorage.getItem('shelby_pin_ok')) {
+    showPinModal('Admin access required', () => {
+      sessionStorage.setItem('shelby_pin_ok', '1');
+      // Directly switch view without going through showView PIN check
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.getElementById('view-'+id).classList.add('active');
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      document.querySelectorAll('#mobile-nav .m-tab').forEach(b => {
+        b.classList.toggle('active', (b.getAttribute('onclick')||'').includes("'"+id+"'"));
+      });
+      if (id === 'entry') initEntry();
+      if (id === 'backup') {
+        const el = document.getElementById('backup-filename-preview');
+        if (el) el.textContent = getBackupFilename();
+        const lsP = JSON.parse(localStorage.getItem('shelby_players') || '[]');
+        const lsM = JSON.parse(localStorage.getItem('shelby_matches') || '[]');
+        const lsT = JSON.parse(localStorage.getItem('shelby_tournaments') || '[]');
+        const summary = document.getElementById('backup-data-summary');
+        if (summary) {
+          const memP = (typeof PLAYERS !== 'undefined') ? PLAYERS.length : 0;
+          summary.innerHTML = '📊 Data found in storage: <strong style="color:var(--text)">' + lsP.length + ' players</strong> · <strong style="color:var(--text)">' + lsM.length + ' matches</strong> · <strong style="color:var(--text)">' + lsT.length + ' tournaments</strong>' +
+            (memP !== lsP.length ? ' &nbsp;|&nbsp; In memory: ' + memP + ' players' : '');
+        }
+      }
+    });
+    return;
   }
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -1047,8 +1101,19 @@ function openPlayerModal(name) {
     const pc = t.placement==='1st'?'p1':t.placement==='2nd'?'p2':t.placement==='3rd'?'p3':'';
     const pts2 = parseFloat(t.points);
     const ptsc = !isNaN(pts2) ? (pts2>0?'var(--green)':pts2<0?'var(--red)':'var(--text-dim)') : 'var(--text-dim)';
+    const rawLabel = t.label || t.date || '';
+    // Clean up ISO date strings like 2025-12-31T17:00:00.000Z
+    let displayLabel = rawLabel;
+    if (/^\d{4}-\d{2}-\d{2}T/.test(rawLabel)) {
+      const d = new Date(rawLabel);
+      displayLabel = d.toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'2-digit'});
+    } else if (/^\d{4}-\d{2}-\d{2}$/.test(rawLabel)) {
+      const [y,m,dy] = rawLabel.split('-');
+      const d = new Date(y, m-1, dy);
+      displayLabel = d.toLocaleDateString('en-GB', {day:'2-digit', month:'short', year:'2-digit'});
+    }
     return `<div class="tourney-item">
-      <span class="t-date">${t.label||t.date}</span>
+      <span class="t-date">${displayLabel}</span>
       <span class="${pc}" style="font-size:13px">${t.placement||'—'}</span>
       <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim)">${t.wins!==''&&t.losses!=='' ? t.wins+'-'+t.losses : '—'}</span>
       <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:${ptsc}">${!isNaN(pts2)?(pts2>0?'+'+pts2:pts2):'—'}</span>
@@ -1162,9 +1227,9 @@ function applyAdminEdit() {
 // ADD PLAYER
 // ════════════════════════════════════════════════════════════
 function openAddPlayer() {
-  const pin = prompt('Enter Admin PIN to add a player:');
-  if (pin === null) return;
-  if (pin.trim() !== ADMIN_PIN) { toast('✕ Incorrect PIN.', true); return; }
+  showPinModal('PIN required to add player', openAddPlayerAuthed);
+}
+function openAddPlayerAuthed() {
   document.getElementById('new-player-name').value = '';
   const sel = document.getElementById('new-player-hcp');
   sel.innerHTML = '<option value="">— Select Handicap —</option>' +
@@ -1176,9 +1241,9 @@ function closeAddPlayer() { document.getElementById('add-player-modal').classLis
 function removePlayer(name) {
   const p = PLAYERS.find(x => x.name === name);
   if (!p) return;
-  const pin = prompt(`Enter Admin PIN to remove "${name}":`);
-  if (pin === null) return;
-  if (pin.trim() !== ADMIN_PIN) { toast('✕ Incorrect PIN.', true); return; }
+  showPinModal(`PIN required to remove ${name}`, () => removePlayerAuthed(name));
+}
+function removePlayerAuthed(name) {
   if (!confirm(`Remove "${name}" (${p.handicap}) from the player list?\nThis cannot be undone.`)) return;
   PLAYERS = PLAYERS.filter(x => x.name !== name);
   savePlayers();
@@ -1309,10 +1374,10 @@ function initEntry() {
   const today = new Date().toISOString().split('T')[0];
   if (!document.getElementById('t-date').value) document.getElementById('t-date').value = today;
   if (!document.querySelector('#res-tbody tr')) {
-    for (let i=0; i<10; i++) addResultRow();
+    for (let i=0; i<20; i++) addResultRow();
   }
   if (!document.querySelector('#match-tbody tr')) {
-    for (let i=0; i<10; i++) addMatchRow();
+    for (let i=0; i<20; i++) addMatchRow();
   }
   updatePtsPreview();
   renderUndoList();
@@ -1424,7 +1489,7 @@ function recomputeAllRows() {
 
 function clearResults() {
   document.getElementById('res-tbody').innerHTML = '';
-  for (let i=0; i<8; i++) addResultRow();
+  for (let i=0; i<20; i++) addResultRow();
   document.getElementById('t-players').value = '';
   updatePtsPreview();
 }
@@ -1614,9 +1679,9 @@ function renderUndoList() {
 }
 
 function undoTournament(idx) {
-  const pin = prompt('Enter Admin PIN:');
-  if (pin === null) return;
-  if (pin.trim() !== ADMIN_PIN) { toast('✕ Incorrect PIN.', true); return; }
+  showPinModal('PIN required to undo tournament', () => undoTournamentAuthed(idx));
+}
+function undoTournamentAuthed(idx) {
   const t = TOURNAMENTS[idx];
   if (!confirm(`Undo tournament "${t.date} — ${t.type}"?\nThis will reverse points for ${t.entries.length} players.`)) return;
 
@@ -1811,9 +1876,9 @@ function buildMatrixTable(tableId) {
 
 // Matrix cell reset
 function promptMatrixReset(hcpA, hcpB) {
-  const pin = prompt(`Enter Admin PIN to reset stats for ${hcpA} vs ${hcpB}:`);
-  if (pin === null) return;
-  if (pin.trim() !== ADMIN_PIN) { toast('✕ Incorrect PIN.', true); return; }
+  showPinModal(`PIN required to reset ${hcpA} vs ${hcpB}`, () => resetMatchStatAuthed(hcpA, hcpB));
+}
+function resetMatchStatAuthed(hcpA, hcpB) {
   if (!confirm(`Reset ALL match history between ${hcpA} and ${hcpB}?\nThis cannot be undone.`)) return;
   let matches = JSON.parse(localStorage.getItem('shelby_matches') || '[]');
   matches = matches.filter(m => !(
@@ -1859,7 +1924,7 @@ function saveMatchResults() {
   if (!count) { toast('⚠ No complete match entries.', true); return; }
   localStorage.setItem('shelby_matches', JSON.stringify(stored));
   document.getElementById('match-tbody').innerHTML = '';
-  for (let i=0; i<10; i++) addMatchRow();
+  for (let i=0; i<20; i++) addMatchRow();
   toast(`✓ ${count} match result${count>1?'s':''} saved!`);
   buildMatrixTable('dash-matrix');
   autoPush();
@@ -1867,7 +1932,7 @@ function saveMatchResults() {
 
 function clearMatchResults() {
   document.getElementById('match-tbody').innerHTML = '';
-  for (let i=0; i<10; i++) addMatchRow();
+  for (let i=0; i<20; i++) addMatchRow();
 }
 
 function loadLocalData() {
@@ -1897,6 +1962,205 @@ function loadLocalData() {
     } catch(e) {} 
   }
 }
+
+// ════════════════════════════════════════════════════════════
+// AI IMAGE SCANNER
+// ════════════════════════════════════════════════════════════
+let scanFiles = [];
+
+function previewScanImages(input) {
+  scanFiles = [...input.files];
+  const preview = document.getElementById('scan-previews');
+  const btn = document.getElementById('scan-go-btn');
+  const status = document.getElementById('scan-status');
+  
+  preview.innerHTML = '';
+  if (scanFiles.length === 0) { btn.style.display='none'; return; }
+  
+  scanFiles.forEach((file, i) => {
+    const url = URL.createObjectURL(file);
+    const img = document.createElement('img');
+    img.src = url;
+    img.style.cssText = 'height:120px;border-radius:6px;border:2px solid var(--accent);object-fit:contain;background:#111';
+    preview.appendChild(img);
+  });
+  
+  btn.style.display = 'inline-block';
+  status.textContent = `${scanFiles.length} photo${scanFiles.length>1?'s':''} ready — click Scan to fill results`;
+  status.style.color = 'var(--text-mute)';
+}
+
+async function fileToBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+async function runScan() {
+  if (scanFiles.length === 0) return;
+  const status = document.getElementById('scan-status');
+  const btn = document.getElementById('scan-go-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Scanning...';
+  status.textContent = '🤖 AI is reading the photos...';
+  status.style.color = 'var(--text-mute)';
+
+  const playerNames = PLAYERS.map(p => p.name + ' (' + p.handicap + ')').join(', ');
+
+  try {
+    // Build image content blocks for all uploaded photos
+    const imageBlocks = [];
+    for (const file of scanFiles) {
+      const base64 = await fileToBase64(file);
+      imageBlocks.push({
+        type: 'image',
+        source: { type: 'base64', media_type: file.type || 'image/jpeg', data: base64 }
+      });
+    }
+    imageBlocks.push({
+      type: 'text',
+      text: `These are ${scanFiles.length > 1 ? scanFiles.length + ' screenshots from the same tournament' : 'a tournament results screenshot'}. One image has the player names and rankings, the other has the match history (W/L record).
+
+Known players in our system (name + handicap): ${playerNames}
+
+Extract all player results and return a JSON array. For each player:
+- "name": match to the closest player in our system above. If the image shows a handicap like "Cris R (B++)", match it to the player with that name and handicap.
+- "placement": their rank like "1st", "2nd", "3rd", "5th", "9th", "13th", "17th" etc
+- "wins": count of W boxes in their match history row
+- "losses": count of L boxes in their match history row  
+- "points": leave as 0 (will be calculated automatically)
+
+Return ONLY a valid JSON array, nothing else. Example:
+[{"name":"Patrick","placement":"1st","wins":5,"losses":1,"points":0},...]`
+    });
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 3000,
+        messages: [{ role: 'user', content: imageBlocks }]
+      })
+    });
+
+    const data = await response.json();
+    if (data.error) throw new Error(data.error.message);
+    const text = data.content?.[0]?.text || '';
+    
+    // Extract JSON array
+    const jsonMatch = text.match(/\[([\s\S]*?)\]/);
+    if (!jsonMatch) throw new Error('AI could not parse results. Try a clearer photo.');
+    
+    let results;
+    try { results = JSON.parse('[' + jsonMatch[1] + ']'); }
+    catch(e) { throw new Error('Invalid JSON from AI: ' + e.message); }
+
+    // Clear rows and fill
+    document.getElementById('res-tbody').innerHTML = '';
+    const needed = Math.max(results.length + 5, 20);
+    for (let i = 0; i < needed; i++) addResultRow();
+    
+    const rows = document.querySelectorAll('#res-tbody tr');
+    let filled = 0;
+    results.forEach((r, i) => {
+      if (i >= rows.length) return;
+      const row = rows[i];
+      const nameInput = row.querySelector('td:first-child input');
+      const placementSel = row.querySelector('.res-select');
+      const scoreInput = row.querySelectorAll('.res-input')[1];
+      
+      // Best match player name
+      const nameLower = (r.name || '').toLowerCase();
+      const matched = PLAYERS.find(p => p.name.toLowerCase() === nameLower)
+        || PLAYERS.find(p => p.name.toLowerCase().includes(nameLower) || nameLower.includes(p.name.toLowerCase()));
+      
+      nameInput.value = matched ? matched.name : (r.name || '');
+      onPlayerInput(nameInput);
+      
+      if (placementSel && r.placement) {
+        const pl = r.placement.toString().replace(/[^0-9a-z]/gi,'').toLowerCase();
+        [...placementSel.options].forEach(o => {
+          if (o.value.toLowerCase().replace(/[^0-9a-z]/g,'') === pl) placementSel.value = o.value;
+        });
+      }
+      if (scoreInput && (r.wins !== undefined && r.losses !== undefined)) {
+        scoreInput.value = r.wins + '-' + r.losses;
+      }
+      recomputeRow(row);
+      filled++;
+    });
+    
+    updateAutoCount();
+    status.textContent = `✅ Filled ${filled} players! Review names and scores, then save.`;
+    status.style.color = '#2e8b57';
+    btn.textContent = '🔄 Re-scan';
+    btn.disabled = false;
+    document.getElementById('res-tbody').closest('.panel, .entry-panel, table')?.scrollIntoView({ behavior:'smooth', block:'start' });
+
+  } catch(err) {
+    console.error('Scan error:', err);
+    status.textContent = '❌ ' + err.message;
+    status.style.color = 'var(--red,#cc0000)';
+    btn.textContent = '🤖 Scan & Fill Results';
+    btn.disabled = false;
+  }
+  
+  document.getElementById('scan-img-input').value = '';
+}
+
+
+// ════════════════════════════════════════════════════════════
+// PIN MODAL
+// ════════════════════════════════════════════════════════════
+let _pinValue = '';
+let _pinCallback = null;
+
+function showPinModal(subtitle, callback) {
+  // On local files, fall back to browser prompt (custom modal blocked by file://)
+  if (location.protocol === 'file:') {
+    const pin = prompt(subtitle || 'Enter Admin PIN:');
+    if (pin === null) return;
+    if (pin.trim() === ADMIN_PIN) {
+      sessionStorage.setItem('shelby_pin_ok', '1');
+      callback();
+    } else {
+      alert('✕ Incorrect PIN');
+    }
+    return;
+  }
+  _pinCallback = callback;
+  document.getElementById('pin-subtitle').textContent = subtitle || 'Enter PIN to continue';
+  document.getElementById('pin-error').textContent = '';
+  document.getElementById('pin-input').value = '';
+  document.getElementById('pin-modal').style.display = 'flex';
+  setTimeout(() => document.getElementById('pin-input').focus(), 100);
+}
+
+function closePinModal() {
+  document.getElementById('pin-modal').style.display = 'none';
+  _pinCallback = null;
+}
+
+function checkPin() {
+  const val = document.getElementById('pin-input').value.trim();
+  if (val === ADMIN_PIN) {
+    closePinModal();
+    if (_pinCallback) _pinCallback();
+  } else {
+    document.getElementById('pin-error').textContent = '✕ Incorrect PIN';
+    document.getElementById('pin-input').value = '';
+    document.getElementById('pin-input').focus();
+  }
+}
+
+// Backdrop click handled inline in showPinModal
 
 // ════════════════════════════════════════════════════════════
 // BACKUP — EXPORT & IMPORT
@@ -2055,10 +2319,13 @@ async function loadFromSheets() {
     try { data = JSON.parse(text); } catch(e) { setSyncIndicator('error'); return; }
     if (data && data.players && data.players.length > 0) {
       PLAYERS = data.players;
-      // Load tournament history from Sheets if it has data with participants
-      if (data.tournaments && data.tournaments.length > 0 && 
-          data.tournaments[0].participants && data.tournaments[0].participants.length > 0) {
-        TOURNEY_HISTORY = data.tournaments;
+      // Load tournament history from Sheets if it has more tournaments than baked
+      // or if any tournament has participant data
+      if (data.tournaments && data.tournaments.length > 0) {
+        const hasParticipants = data.tournaments.some(t => t.participants && t.participants.length > 0);
+        if (data.tournaments.length > BAKED_TOURNEY_HISTORY.length || hasParticipants) {
+          TOURNEY_HISTORY = data.tournaments;
+        }
       }
       localStorage.setItem('shelby_players', JSON.stringify(PLAYERS));
       renderPlayers();
@@ -2126,5 +2393,21 @@ localStorage.setItem('shelby_matches', JSON.stringify(BAKED_MATCHES));
 renderPlayers();
 loadFromSheets();
 </script>
+
+<!-- ══ PIN MODAL ══ -->
+<div id="pin-modal" onclick="if(event.target===this)closePinModal()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;align-items:center;justify-content:center">
+  <div class="modal" style="max-width:340px;padding:28px 24px;text-align:center">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--accent);margin-bottom:4px">🔐 ADMIN ACCESS</div>
+    <div id="pin-subtitle" style="font-size:12px;color:var(--text-mute);margin-bottom:20px;letter-spacing:.5px">Enter PIN to continue</div>
+    <input id="pin-input" type="password" maxlength="6" placeholder="••••••"
+      style="width:140px;padding:10px 14px;font-size:22px;text-align:center;letter-spacing:6px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);outline:none"
+      onkeydown="if(event.key==='Enter')checkPin()">
+    <div id="pin-error" style="color:var(--red,#cc0000);font-size:12px;margin-top:10px;min-height:16px"></div>
+    <div style="display:flex;gap:10px;margin-top:16px;justify-content:center">
+      <button onclick="closePinModal()" style="padding:9px 22px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text-dim);font-weight:700;font-size:13px;cursor:pointer">Cancel</button>
+      <button onclick="checkPin()" style="padding:9px 28px;background:var(--accent);border:none;border-radius:7px;color:#000;font-weight:700;font-size:13px;cursor:pointer;letter-spacing:.5px">UNLOCK</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
