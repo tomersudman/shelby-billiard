@@ -916,9 +916,9 @@ function mobileNav(id, btn) {
 
 function showView(id, btn) {
   // PIN protect Entry and Backup tabs
-  if ((id === 'entry' || id === 'backup') && !sessionStorage.getItem('shelby_pin_ok')) {
+  if ((id === 'entry' || id === 'backup') && !window._adminUnlocked) {
     showPinModal('Admin access required', () => {
-      sessionStorage.setItem('shelby_pin_ok', '1');
+      window._adminUnlocked = true;
       showView(id, btn);
     });
     return;
@@ -2107,7 +2107,7 @@ function showPinModal(subtitle, callback) {
     const pin = prompt(subtitle || 'Enter Admin PIN:');
     if (pin === null) return;
     if (pin.trim() === ADMIN_PIN) {
-      sessionStorage.setItem('shelby_pin_ok', '1');
+      window._adminUnlocked = true;
       callback();
     } else {
       alert('✕ Incorrect PIN');
