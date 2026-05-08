@@ -1369,7 +1369,15 @@ function addResultRow() {
         <option>1st</option><option>2nd</option><option>3rd</option><option>4th</option>
       </select>
     </td>
-    <td><input class="res-input" placeholder="e.g. 3-2" maxlength="6" oninput="recomputeRow(this.closest('tr'))"></td>
+    <td style="display:flex;align-items:center;gap:3px;padding:4px">
+      <select class="res-select wl-select" onchange="recomputeRow(this.closest('tr'))" style="width:52px;padding:5px 2px;text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px">
+        ${[0,1,2,3,4,5,6,7,8].map(n=>`<option value="${n}">${n}W</option>`).join('')}
+      </select>
+      <span style="color:var(--text-mute);font-size:11px">-</span>
+      <select class="res-select wl-select" onchange="recomputeRow(this.closest('tr'))" style="width:52px;padding:5px 2px;text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px">
+        ${[0,1,2].map(n=>`<option value="${n}">${n}L</option>`).join('')}
+      </select>
+    </td>
     <td class="pts-cell" style="color:var(--text-mute)">—</td>
     <td><button onclick="this.closest('tr').remove();updateAutoCount()" style="background:none;border:none;color:var(--text-mute);cursor:pointer;font-size:15px;padding:2px 6px" title="Remove row">✕</button></td>`;
   tbody.appendChild(tr);
@@ -1407,6 +1415,20 @@ function selectPlayer(opt, name) {
 }
 
 function onPlayerInput(input) {
+  // Check for duplicate player in same tournament
+  const name = input.value.trim();
+  if (name) {
+    const allInputs = document.querySelectorAll('#res-tbody tr td:first-child input');
+    let count = 0;
+    allInputs.forEach(inp => { if (inp !== input && inp.value.trim() === name) count++; });
+    if (count > 0) {
+      input.style.border = '2px solid var(--red)';
+      input.title = 'Duplicate player!';
+    } else {
+      input.style.border = '';
+      input.title = '';
+    }
+  }
   const name = input.value.trim();
   const p = PLAYERS.find(x => x.name.trim() === name);
   const row = input.closest('tr');
@@ -1436,7 +1458,8 @@ function recomputeRow(row) {
   const n    = parseInt(document.getElementById('t-players').value) || 0;
   const tds  = row.querySelectorAll('td');
   const placement = tds[2].querySelector('select')?.value || '';
-  const record    = tds[3]?.querySelector('input')?.value || '';
+  const wlSelects  = tds[3]?.querySelectorAll('select');
+  const record     = wlSelects?.length >= 2 ? wlSelects[0].value + '-' + wlSelects[1].value : '';
   const ptsEl     = tds[4];
   const pts = calcPts(type, n, placement, record);
   if (pts === '' || pts === undefined) {
@@ -1476,18 +1499,24 @@ function saveResults() {
     const playerName = tds[0].querySelector('input')?.value?.trim();
     if (!playerName || !PLAYERS.find(x => x.name.trim() === playerName)) return;
     const placement = tds[2].querySelector('select')?.value || '';
-    const record    = tds[3].querySelector('input')?.value || '';
+    const wlSelects  = tds[3].querySelectorAll('select');
+    const wins       = wlSelects?.length >= 2 ? parseInt(wlSelects[0].value) || 0 : 0;
+    const losses     = wlSelects?.length >= 2 ? parseInt(wlSelects[1].value) || 0 : 0;
+    const record     = wins + '-' + losses;
     const pts = calcPts(type, n, placement, record);
-    if (pts === '' && !placement && !record) return;
-    const wl = record.includes('-') ? record.split('-') : ['',''];
+    if (pts === '' && !placement && wins === 0 && losses === 0) return;
     entries.push({
       name: playerName, placement,
-      wins: parseInt(wl[0]) || 0, losses: parseInt(wl[1]) || 0,
+      wins, losses,
       points: pts !== '' ? pts : 0,
     });
   });
 
   if (!entries.length) { toast('⚠ No valid player entries found.', true); return; }
+  // Check for duplicate players
+  const names = entries.map(e => e.name);
+  const dupes = names.filter((n, i) => names.indexOf(n) !== i);
+  if (dupes.length) { toast(`⚠ Duplicate player: ${[...new Set(dupes)].join(', ')}`, true); return; }
 
   // Save snapshot for undo, track promo changes
   // Snapshot BEFORE applying changes
@@ -1545,19 +1574,22 @@ function saveResults() {
     }
   });
 
-  // Recalculate win rates from tournament history
+  // Update win rates incrementally - add new wins/losses to existing totals
   entries.forEach(e => {
     const p = PLAYERS.find(x => x.name.trim() === e.name.trim());
     if (!p) return;
-    let totalW = 0, totalL = 0;
-    p.tournaments.forEach(t => {
-      if (typeof t.wins === 'number') totalW += t.wins;
-      if (typeof t.losses === 'number') totalL += t.losses;
-    });
+    const newW = e.wins || 0;
+    const newL = e.losses || 0;
+    if (newW === 0 && newL === 0) return;
+    // Back-calculate existing totals from stored win rate and games_played
+    const prevGames = p.games_played || 0;
+    const prevW = Math.round((p.lifetime_win_pct || 0) / 100 * prevGames);
+    const totalW = prevW + newW;
+    const totalL = (prevGames - prevW) + newL;
     const total = totalW + totalL;
     if (total > 0) {
       p.lifetime_win_pct = Math.round(totalW / total * 1000) / 10;
-      p.cur_hcp_win_pct  = p.lifetime_win_pct; // simplified — same as lifetime for new entries
+      p.cur_hcp_win_pct  = Math.round(totalW / total * 1000) / 10;
     }
     p.games_played = total;
   });
@@ -1570,10 +1602,17 @@ function saveResults() {
     date, type, label: `${date} — ${type}`,
     is_high_stakes: type === 'High Stakes',
     total_players: n,
-    participants: snapshot.map(e => ({
-      name: e.name, handicap: e.handicap, placement: e.placement,
-      wins: e.wins, losses: e.losses, points: e.points
-    }))
+    participants: entries.map(e => {
+      const p = PLAYERS.find(x => x.name.trim() === e.name.trim());
+      return {
+        name: e.name,
+        handicap: p ? p.handicap : '',
+        placement: e.placement || '',
+        wins: e.wins !== undefined ? e.wins : '',
+        losses: e.losses !== undefined ? e.losses : '',
+        points: e.points
+      };
+    })
   });
   localStorage.setItem('shelby_tourney_history', JSON.stringify(TOURNEY_HISTORY));
   saveTournaments();
@@ -1771,7 +1810,7 @@ function renderHistory() {
               <td style="font-weight:500">${p.name}</td>
               <td>${p.handicap ? hcpBadge(p.handicap) : '—'}</td>
               <td class="${pc}">${p.placement||'—'}</td>
-              <td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim)">${p.wins!==''&&p.losses!=='' ? p.wins+'-'+p.losses : '—'}</td>
+              <td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-dim)">${(p.wins!==undefined&&p.wins!==''&&p.losses!==undefined&&p.losses!=='') ? p.wins+'-'+p.losses : '—'}</td>
               <td style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:${ptsc}">${!isNaN(pts)?(pts>0?'+'+pts:pts):'—'}</td>
             </tr>`;
           }).join('')}</tbody>
@@ -2126,6 +2165,16 @@ async function loadFromSheets() {
       if (data.tournaments && data.tournaments.length > 0) {
         const hasParticipants = data.tournaments.some(t => t.participants && t.participants.length > 0);
         if (data.tournaments.length > BAKED_TOURNEY_HISTORY.length || hasParticipants) {
+          // Sanitize participants to remove undefined wins/losses
+          data.tournaments.forEach(t => {
+            if (t.participants) t.participants = t.participants.map(p => ({
+              ...p,
+              wins: (p.wins !== undefined && p.wins !== '') ? p.wins : '',
+              losses: (p.losses !== undefined && p.losses !== '') ? p.losses : '',
+              placement: p.placement || '',
+              points: p.points !== undefined ? p.points : 0
+            }));
+          });
           TOURNEY_HISTORY = data.tournaments;
         }
       }
