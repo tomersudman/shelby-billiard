@@ -1207,9 +1207,6 @@ function removePlayer(name) {
     if (pin.trim() !== ADMIN_PIN) { toast('✕ Incorrect PIN.', true); return; }
     window._adminUnlocked = true;
   }
-  removePlayerAuthed(name);
-}
-function removePlayerAuthed(name) {
   if (!confirm(`Remove "${name}" (${p.handicap}) from the player list?\nThis cannot be undone.`)) return;
   PLAYERS = PLAYERS.filter(x => x.name !== name);
   savePlayers();
@@ -1761,6 +1758,7 @@ function renderHistory() {
         ${typeBadge}
         <span class="th-players">${t.total_players || participants.length} players</span>
         <span class="th-expand" id="arr-${id}">▼</span>
+        <button onclick="event.stopPropagation();deleteTournament(${idx})" title="Delete tournament" style="background:none;border:none;color:var(--text-mute);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:4px;margin-left:4px" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--text-mute)'">🗑</button>
       </div>
       <div class="th-body" id="${id}">
         <table class="th-table">
@@ -1781,6 +1779,31 @@ function renderHistory() {
       </div>
     </div>`;
   }).join('');
+}
+
+function deleteTournament(idx) {
+  if (!window._adminUnlocked) {
+    const pin = prompt('Enter Admin PIN:');
+    if (pin === null) return;
+    if (pin.trim() !== ADMIN_PIN) { toast('✕ Incorrect PIN.', true); return; }
+    window._adminUnlocked = true;
+  }
+  // idx is based on combined list: first newTourneys then TOURNEY_HISTORY
+  const newCount = TOURNAMENTS.length;
+  if (idx < newCount) {
+    // It's a newly entered tournament - remove from TOURNAMENTS
+    if (!confirm(`Delete this tournament? This will NOT reverse player points.`)) return;
+    TOURNAMENTS.splice(idx, 1);
+    saveTournaments();
+  } else {
+    // It's from TOURNEY_HISTORY
+    const histIdx = idx - newCount;
+    if (!confirm(`Delete this tournament from history? This will NOT reverse player points.`)) return;
+    TOURNEY_HISTORY.splice(histIdx, 1);
+    localStorage.setItem('shelby_tourney_history', JSON.stringify(TOURNEY_HISTORY));
+  }
+  renderHistory();
+  toast('✓ Tournament deleted from history.');
 }
 
 function toggleHistory(id) {
