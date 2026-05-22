@@ -1396,7 +1396,7 @@ function addResultRow() {
       </select>
       <span style="color:var(--text-mute);font-size:11px">-</span>
       <select class="res-select wl-select" onchange="recomputeRow(this.closest('tr'))" style="width:52px;padding:5px 2px;text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px">
-        ${[0,1,2].map(n=>`<option value="${n}">${n}</option>`).join('')}
+        ${[0,1,2].map(n=>`<option value="${n}"${(rowIdx>0 && n===2) || (rowIdx===0 && n===0) ?' selected':''}>${n}</option>`).join('')}
       </select>
     </td>
     <td class="pts-cell" style="color:var(--text-mute)">—</td>
