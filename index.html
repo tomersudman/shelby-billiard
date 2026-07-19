@@ -797,6 +797,9 @@ main { position:relative; z-index:1; padding:22px 24px; max-width:1500px; margin
   <button class="m-tab" onclick="mobileNav('live',this)">
     <span class="m-icon">📺</span>Live
   </button>
+  <button class="m-tab" onclick="mobileNav('entry',this)">
+    <span class="m-icon">📝</span>Results
+  </button>
   <button class="m-tab" onclick="mobileNav('rules',this)">
     <span class="m-icon">📋</span>Rules
   </button>
@@ -842,7 +845,6 @@ main { position:relative; z-index:1; padding:22px 24px; max-width:1500px; margin
         <th class="th-center" onclick="setSortAndRender('handicap')">Handicap</th>
         <th class="th-center" onclick="setSortAndRender('pts-desc')">Running Pts</th>
         <th class="th-center" onclick="setSortAndRender('winrate')">Win % (Cur. HCP)</th>
-        <th class="th-center" onclick="setSortAndRender('lifetime')">Win % (Lifetime)</th>
         <th class="th-center" onclick="setSortAndRender('games')">Games</th>
         <th style="width:40px"></th>
       </tr></thead>
@@ -1719,7 +1721,6 @@ function renderPlayers() {
       <td class="pl-center">${tierPill}</td>
       <td class="pl-center ${ptsClass(pts)}">${ptsSign(pts)}</td>
       <td class="pl-center" style="font-family:'JetBrains Mono',monospace;font-size:13px;color:${wp>0?wpColor:'var(--text-mute)'}">${wp > 0 ? wp.toFixed(1)+'%' : '—'}</td>
-      <td class="pl-center" style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--text-dim)">${lp > 0 ? lp.toFixed(1)+'%' : '—'}</td>
       <td class="pl-center" style="color:var(--text-dim)">${p.games_played || 0}</td>
       <td class="pl-center"><button onclick="event.stopPropagation();removePlayer('${safeName}')" class="pl-remove" title="Remove player">✕</button></td>
     </tr>`;
